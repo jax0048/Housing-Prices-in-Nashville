@@ -1,0 +1,614 @@
+---
+title: "Generalizable Housing Market Prediction Model for Zillow: A Look into Nashville"
+author: "Shuhui Huang, Jiaxin Wu"
+date: "November 2018"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, warning = FALSE, message = FALSE, echo = FALSE}
+
+options(scipen = 999) # Avoid scientific Notation
+# options(repos=structure(c(CRAN="https://cran.cnr.berkeley.edu/")))
+
+# KenData <- read.csv("C:/Users/jax0048/Desktop/Data/train.and.test_student_NA.csv") # 8409 obs
+KenData <- read.csv("D:/Desktop/Project1/Data/train.and.test_student_NA.csv") # 8409 obs
+
+# install.packages("corrplot")
+# install.packages("caret")
+# install.packages("AppliedPredictiveModeling")
+# install.packages("stargazer")
+# install.packages("tidyverse")
+# install.packages("sf")
+# install.packages("viridis")
+# install.packages("Hmisc")
+# install.packages("knitr")
+# install.packages("kableExtra")
+
+library(corrplot) # corrplot()
+library(caret) # createDataPartition
+library(AppliedPredictiveModeling) # predict()
+library(stargazer)
+library(tidyverse) # select()
+library(sf) # pipe %>%
+library(viridis)
+library(knitr)
+library(kableExtra)
+
+# Set map theme
+mapTheme <- function(base_size = 12) {
+  theme(
+    text = element_text( color = "black"),
+    plot.title = element_text(size = 14,colour = "black"),
+    plot.subtitle=element_text(face="italic"),
+    plot.caption=element_text(hjust=0),
+    axis.ticks = element_blank(),
+    panel.background = element_blank(),axis.title = element_blank(),
+    axis.text = element_blank(),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_rect(colour = "black", fill=NA, size=2)
+  )
+}
+```
+
+The following project is the midterm project for MUSA 507 at the University of Pennsylvania, taught by Ken Steif. 
+This report is split into 4 sections: **Introduction**, **Exploratory analysis**, **Methods**, **Results**, **Discussion** and **Conclusion**. 
+
+## 1. Introductiong
+Zillow conducted the estimation (Zestimate) for housing market based on a range of available information, including data and sales of comparable houses in a neighborhood. For a long time, the accuracy of Zestimate has been under skeptical critiques. Our duty is to build a better predictive model of home prices for Nashville.  
+
+### 1.1 Abstract
+There are three main components that determine home price collectively: **Internal Characteristics**, **Regional Amenity Access or Public Service**, and **Spatial Structure**. Our goal is to gather as much data as we can from online available recourses that covers these three components, and create a **Generalizable** predictive model.
+
+### 1.2 Modeling Purpose
+We prioritize generalizability as the key criterion to evaluate our regression model during optimization process, based on two concerns. First of all, we want to predict well for data the model has **not seen** yet. Secondly, we hope our model can be applicable to all **locations** and **cases**, regardless of economic development discrepancy or regional difference.  
+
+### 1.3 Modeling Strategy
+Our strategy is split into two parts: One, for selecting enough variables that cover the three domain components; and the other, for generating a model that carries out high generalizability. For the first part, we append the variables to the primary dataset, based on our domain knowledge and intuitions. And for each regression with new variables, we observe their significance , and change the variable selection, until we find the optimized one. Due to the limitation of our domain knowledge and experiences in prediction model, this is a trial-and-error process. What's more, in order to create a generalizable model, we evaluate our models in out-of-sample data with indicators such as **MAE (Mean Absolute Eroor)** and **MAPE (Mean Absolute Percentage Error)**, we will explain these two concepts in details later on. 
+
+## 2. Methods
+
+### 2.1 Data Wrangling
+Before running the regression model, we remove out some observations with empty or apparently wrong values (i.e. year the house was built is recorded 0 that makes no sense). After first attempt to build the housing prices prediction model, we remove out some insignificant variables according to p-value, that is, the probability that a given variable is not associated with housing price (i.e. the lower the p-value, the smaller the probability). 
+
+### 2.2 Exploratory Data Analysis
+
+We examine correlation between each two numeric variables to observe whether severe multicollinear relationship exists among these predictor variables. Severe multicollinear can increase the variance of the coefficient estimates, sap the statistical power of the analysis, and make it more difficult to specify the correct model. Correlation is a standardized measure of the strength of the relationship between variables.
+
+### 2.3 Modelling - Multiple Regression Analysis
+
+In general, multiple regression is used to examine the relationship between dependent variable and independent variables (predictors), that is, how dependent variable changes as independent variables vary by one unit. Additionally, it also includes how well the analysis model explains the dependent variable.
+
+### 2.4 Modelling - Training and Test
+
+Generally, the data set we have with 9000 observations is large enough for this case. But it's only one data set where we may luckily succeed to acquire good prediction results but fail in different samples. Thus, we randomly selected 75% observations and placed them into the training data set, by which we estimate parameters (i.e., ?? coefficients). We then take the coefficients estimated from the training data set and compute the predicted value and the residual i for each observation indexed in the test data set. 
+
+### 2.5 Modelling - K-fold Cross Validation
+
+In k-fold cross-validation, the original sample is randomly partitioned into k equal sized subsamples. Of the k subsamples, a single subsample is retained as the validation data for testing the model, and the remaining k-1 subsamples are used as training data. The cross-validation process is then repeated k times, with each of the k subsamples used exactly once as the validation data. The k results can then be averaged to produce a single estimation. The advantage of this method over repeated random sub-sampling (see below) is that all observations are used for both training and validation, and each observation is used for validation exactly once. 
+
+## 3. Exploratory Analysis
+
+### 3.1 Methods for Gathering Data
+
+#### 3.1.1 Primary data
+Most data are collected from the original "train.and.test_student.csv" file, where I select almost all variables. It's a common way to examine statistic pattern among independent and dependent parameters, usually known as **Kitchen Sink Regression**, which means we throw everything but the kitchen sink into the regression model. However, it often leads to **Overfitting**, that is, the result of this analysis corresponds too closely to a particular dataset and performs well in this sample, while fails to fit additional data out of sample (i.e. applied to different locations or cases). Thus, I filter out some obviously insignificant variables manually in order to avoid such overfitting mistake at first.
+
+#### 3.1.2 Supplement data
+Good performance of regression model needs the sustenance of comprehensive dataset. Variables from primary data mainly focus on internal characters. For the purpose of accuracy, it's necessary to find as much important environmental qualities as possible that these houses benefit from, based on the assumption that housing price reflects not only structural attributes, but also social, locational and environmental features. We compute the distances to several public services and facilities of each house in the sample, which represents the convenience people are likely to care about when choosing a future neighborhood to live in.
+
+### 3.2 Exploratory Data Analysis
+Let's first explore the the main characterisitics of our data, with three main questions in mind:
+
+??? How does house price vary regionally in Nashville?
+??? What are the general statistical characteristics of variables, categorized by three main components: internal charactristics, regional amenity access or public service, and spatial structure?
+??? Are indicators correlated with each other? If so, to what extend are they correlated?
+
+#### 3.2.1 Housing Prices Map
+We visualize how house price varies across Dadvison County by dividing price values with quantile breaks. High house price values are obviously clusterred in Nashville city, while the northern and southeastern areas seems to render lower house price. This phenomenon can be potentially explained by neighborhood amenity access/public service, or spatial structure. We would like to discover variables that can prehend these characteristics. 
+
+```{r, warning = FALSE, message = FALSE, echo = FALSE}
+# baseMap <-  read_sf("C:/Users/shuhuih/Desktop/midterm project/NashvilleMap/NashvilleZip.shp")
+baseMap <-  read_sf("D:/Desktop/Project 1/Data/NashvilleZip/NashvilleZip.shp")
+# baseMap <-  read_sf("C:/Users/jax0048/Desktop/Data/NashvilleZip/NashvilleZip.shp")
+
+Saleprice_data <-
+  KenData %>%
+  filter(test == 0) %>%
+  select(SalePrice, WGS1984Y, WGS1984X)
+
+colnames(Saleprice_data)<-c("sale_price","latitude","longitude")
+
+ggplot() +
+  geom_sf(data = baseMap, aes(), fill = "white", alpha = 0.5, colour = "grey75", size = 0.7) +
+  geom_point(data = Saleprice_data,
+            aes(longitude,latitude, color = factor(ntile(sale_price,5))), size = 0.75, alpha = 0.6) +
+  scale_colour_manual(values = c("#ffffcc","#a1dab4","#41b6c4","#2c7fb8","#253494"),
+                    labels = as.character(quantile(Saleprice_data$sale_price,
+                                                 c(.1,.2,.4,.6,.8),na.rm=T)),
+                    name="Sale Prices") +
+  labs(title = "Housing Prices Map", hjust = 0.5)
+
+
+```
+  
+#### 3.2.2 Summary Statistics by Variable Category
+We selected the variables based on three categories: internal characteristics, amenities/public services and spatial structures. 
+
+#### a) Internal Characteristics - (i). Categorical Variables
+In our dataset, there are 8 types of land use among these properties, from which the **Single Famlity** counts the most (5566), followed by **Residential Condo** (3560), **Vacant Residential Land** (630) and others. And there are 118 different years when the properties were built and 104 when refitted. 
+
+```{r, warning = FALSE, message = FALSE, echo = FALSE}
+
+#Internal Characteristics a Factors
+interChar_factor <- KenData %>%
+  select(LandUseFullDescription, yearbuilt_building, effyearbuilt_building)
+
+LandUseFullDescription_c <- count(KenData, "LandUseFullDescription")
+yearbuilt_building_c <- count(KenData, "yearbuilt_building")
+effyearbuilt_building_c <- count(KenData, "effyearbuilt_building")
+
+interChar_factor_count <- c(8,118,104)
+interChar_factor_dp <- c("Types of Land use","Counts of Year the Building was Built", "Counts of Year the Building was Refitted")
+interChar_factor_name <- c("LandUseFullDescription", "yearbuilt_building", "effyearbuilt_building")
+
+interChar_factor <- data.frame(interChar_factor_name, interChar_factor_count, interChar_factor_dp)
+# row.names(interChar_factor) <- c("LandUseFullDescription", "yearbuilt_building", "effyearbuilt_building")
+colnames(interChar_factor) <- c("Variable", "Count", "Description")
+
+kable(interChar_factor, align = "l") %>%
+  kable_styling(bootstrap_options = c("striped", "hover","condensed"))
+```
+
+#### a) Internal Characteristics - (ii). Numerical Variables
+Here are other variables reflecting the interal situation of a property: acres, numbers of rooms in a building, square feet of the basement, the gross footage, number of baths, number of estimated plumbing fixtures.
+
+```{r, echo = FALSE}
+# b Numerics
+interChar_numeric <- KenData %>%
+  select(Acrage, roomsunits_building, sf_bsmt_fin, sf_sketched, ac_sfyi, baths, Fixtures)
+
+# stargazer(interChar_numeric, type = "text")
+
+Acrage <- c(10000,   0.230,     0.720,   0.000,  0.000,    0.270,   47.970)
+roomsunits_building <- c(10000,   5.532,     2.228,     0,      5,        7,       19  )
+sf_bsmt_fin <- c(10000,  55.696,    214.698,    0,     0,        0,     2600)
+sf_sketched <- c(10000, 2334.107, 1432.409,   0,    1416,    3012,   16671)
+ac_sfyi <- c(10000,   0.964,     0.187,     0,     1,        1,     1   )
+baths <- c(10000,   1.863,     0.946,     0,     1,        2,       8   )
+Fixtures <- c(9351,    9.632,     3.654,   2.000,  7.000,    12.000,  38.000)
+
+# inter_num_name <- c("Count", "Mean", "St.Dev", "Min", "Pctl25", "Pctl75", "Max")
+
+inter_num_df <- rbind(Acrage, roomsunits_building, sf_bsmt_fin, sf_sketched, ac_sfyi,baths, Fixtures)
+
+colnames(inter_num_df) <- c("Count", "Mean", "St.Dev", "Min", "Pctl25", "Pctl75", "Max")
+
+kable(inter_num_df, align = "l") %>%
+  kable_styling(bootstrap_options = c("striped", "hover","condensed"))
+```
+
+#### b) Amenities Access/Public Services
+From Nashvile OpenData, we select 10 variables to represent the access to amenities or public services of each building. All of these variables are measured by distance.
+
+```{r, echo = FALSE}
+# 2.3.2 Amenity Access Variables
+
+d_library <- c(10000, 2428.773,1498.864,39.144,1335.216,3099.137,8146.790)
+d_Water <- c(10000, 1944.646, 1278.648, 36.686, 937.610,2717.328,7274.143)
+d_Parks <- c(10000, 1290.016, 1056.556, 24.813, 585.825,1681.293,6962.002)
+d_Police <- c(10000, 1140.939,  592.201,  38.733,   717.759,  1460.698, 4519.312)
+d_Social <-c(10000, 3036.300, 1914.394, 40.057,  1517.536, 4152.545, 10529.860)
+d_RTA <- c(10000, 6412.497, 3960.675, 191.174, 3010.260, 9629.733, 17291.990)
+d_FireSta <- c(10000, 1570.831,800.036,31.665, 983.042,  2096.504, 5126.848 )
+d_Hospital <- c(10000, 5037.759, 3263.913, 122.566, 2681.394, 6830.771,15963.460)
+d_Recycle <- c(10000, 2987.107, 1402.089, 96.506,  1993.900, 3752.504, 8312.999 )
+d_MTA <- c(10000,  468.824,   434.778,   7.901,   160.976,   643.426,  3479.194)
+
+
+amenityVar_sum <- rbind(d_library, d_Water, d_Parks, d_Police, d_Social, d_RTA, d_FireSta, d_Hospital, d_Recycle, d_MTA)
+colnames(amenityVar_sum) <- c("Count", "Mean", "St.Dev", "Min", "Pctl25", "Pctl75", "Max")
+
+kable(amenityVar_sum, align = "l", title = "Summary Table for Spatial Structure Variables") %>%
+  kable_styling(bootstrap_options = c("striped", "hover","condensed"))
+```
+
+#### c) Spatial structure variables
+We use Zip code of location, specific code that the Zillow accessor use to group similar properties, and the council district ID which identifies the tax levy, to represent the factors that may be able to capture the spatial structure. 
+
+```{r, echo = FALSE}
+spatialVar <- KenData %>%
+  select(LocationZip, CouncilDistrict, NeighborhoodAssessor)
+
+spatial_count <- c("23","530","32")
+spatial_dp <- c("Location Zip", "Code to group similar properties", "Identify the tax levy")
+
+spatialVar <- data.frame(spatial_count, spatial_dp)
+row.names(spatialVar)<-c("LocationZip","NeighborhoodAssessor","CouncilDistrict")
+colnames(spatialVar)<-c("Count","Discription")
+kable(spatialVar, align = "l", title = "Summary Table for Spatial Structure Variables") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+```
+
+#### 3.2.3 Correlation Matrix
+
+We observe correlation of each couple of variables. The number of rooms in a house will directly influence the gross footage. And the number of plumbing fixtures can also indicate whether this is a big or small property. Even more obviously, a large number of plumbing fixtures tells a large number of bath rooms. In the amenities access variables, the distance to park is associated with the distance to hospital.
+
+High correlations among predictor variables may indicate multicollinearity, but it is NOT a reliable indicator that it exists, because true multicollinearity is indeed uncommon.
+
+
+```{r, warning = FALSE, message = FALSE, echo = FALSE}
+# Select Numeric Variables
+NumVar <- KenData %>%
+  select(
+    Acrage,
+    roomsunits_building,
+    sf_bsmt_fin,
+    sf_sketched,
+    baths,
+    Fixtures,
+    d_library,
+    d_Water,
+    d_Parks,
+    d_Police,
+    d_Social,
+    d_RTA,
+    d_FireSta,
+    d_Hospital,
+    d_Recycle,
+    d_MTA
+    ) %>%
+  na.omit()
+
+#Correlation Matrix
+M <- cor(NumVar)
+
+# corrplot(M, method = "square")
+
+corrplot(M, method = "color",
+         #type = "upper",
+         addCoef.col = "black", number.cex = 0.5,
+         tl.col = "black", tl.srt = 90, tl.cex = 0.8,
+         sig.level = 0.5, insig = "blank")
+
+```
+
+### 3.3 Variables Map × 3
+We are now exploring three variables which we consider may be more important than others. We discover that houses in suburban areas tend to have more acres of land than the ones in center city. And obviously, the values of distance of a property to regional transportation authority bus stops, is getting larger with the distance to center city, which comply with the reality that public transportation is more accessible in urban areas. As for the gross footage, we find that houses with large area are clustered in rural areas.
+
+```{r, warning = FALSE, message = FALSE, echo = FALSE}
+# a. Acres of Land
+Acrage <-
+  KenData %>%
+  filter(test == 0) %>%
+  select(Acrage, WGS1984Y, WGS1984X) %>%
+  as.data.frame()
+colnames(Acrage) <- c("value", "latitude", "longitude")
+
+ggplot() +
+  geom_sf(data = baseMap, aes(), fill = "white", alpha = 0.5, colour = "grey75", size = 0.7) +
+  geom_point(data = Acrage,
+            aes(longitude, latitude, color = value),
+            size = 0.75, alpha = 0.6) +
+  scale_color_viridis(limits = c(0,1), direction=-1, name="Acres") +
+  labs(title = "Acres of Land", hjust = 0.5)
+
+
+# b. Distance to RTA
+d_RTA <-
+  KenData %>%
+  filter(test == 0) %>%
+  select(d_RTA, WGS1984Y, WGS1984X) %>%
+  as.data.frame()
+colnames(d_RTA) <- c("value", "latitude", "longitude")
+
+ggplot() +
+  geom_sf(data = baseMap, aes(), fill = "white", alpha = 0.5, colour = "grey75", size = 0.7) +
+  geom_point(data = d_RTA,
+            aes(longitude, latitude, color = value),
+            size = 0.75, alpha = 0.6) +
+  scale_color_viridis(direction=-1, name="Meters") +
+  labs(title = "Distance to Regional Transportation Authority (RTA) Bus Stops", hjust = 0.5)
+
+
+# c.Gross Footage
+sf_sketched <-
+  KenData %>%
+  filter(test == 0) %>%
+  select(sf_sketched, WGS1984Y, WGS1984X) %
+>%
+  as.data.frame()
+colnames(sf_sketched) <- c("value", "latitude", "longitude")
+
+ggplot() +
+  geom_sf(data = baseMap, aes(), fill = "white", alpha = 0.5, colour = "grey75", size = 0.7) +
+  geom_point(data = sf_sketched,
+            aes(longitude, latitude, color = value),
+            size = 0.75, alpha = 0.6) +
+  scale_color_viridis(limits = c(0,5000), direction=-1, name="Square Foot") +
+  labs(title = "Gross Footage", hjust = 0.5)
+
+
+
+```
+
+## 4. Results
+
+```{r, warning = FALSE, message = FALSE, echo = FALSE}
+
+# 60 observations in test999, whose year & effyear are 0, tough to modify
+KenData_Selected_2 <- KenData[,c(1,3,13,14,22,23,24,33,39,42,43,48,51,55:67)] # NOT including year & effyear
+
+InSample_2 <-
+  KenData_Selected_2 %>%
+  mutate(LocationZip = as.factor(LocationZip),
+         CouncilDistrict = as.factor(CouncilDistrict),
+         NeighborhoodAssessor = as.factor(NeighborhoodAssessor),
+         #yearbuilt_building = as.factor(yearbuilt_building),
+         #effyearbuilt_building = as.factor(effyearbuilt_building),
+         ac_sfyi = as.factor(ac_sfyi)
+  ) %>%
+  as.data.frame() %>%
+  filter(test == 0) %>% # Filter 9001-observation sample with sale price
+  select(-test) %>% # Remove variables not used in regression
+  na.omit() # Remove observations without valid values
+
+reg2 <- lm(SalePrice ~ ., data = select(InSample_2, -kenID, -WGS1984X, -WGS1984Y))
+# summary(reg2)
+
+inTrain <- createDataPartition(
+  y = InSample_2$NeighborhoodAssessor,
+  p = .75, list = FALSE)
+
+training <- InSample_2[inTrain,] #the training set (75%)
+# regression training
+regTrain <- lm(SalePrice ~ ., data = select(training, -kenID, -WGS1984X, -WGS1984Y))
+# summary(regTrain)
+
+test <- InSample_2[-inTrain,]  #the new test set (25%)
+
+# Using regression-training to predict Y in test set
+testPred <- predict(regTrain, select(test, -kenID, -WGS1984X, -WGS1984Y))
+
+testPredDF <-
+  data.frame(Zip = test$LocationZip, kenID = test$kenID,
+             observedSales = test$SalePrice,
+             predictedSales = testPred,
+             longitude = test$WGS1984X,
+             latitude = test$WGS1984Y) %>% # Used in 4.7
+  mutate(error = predictedSales - observedSales,
+         absError = abs(predictedSales - observedSales),
+         percentAbsError = abs(predictedSales - observedSales) / observedSales,
+         errorSquare = error^2) 
+
+# observedMean <- mean(testPredDF$observedSales)
+# 
+# testSSE <- sum(testPredDF$errorSquare)
+# testSSR <- sum((testPredDF$predictedSales - observedMean)^2)
+# testSST <- sum((testPredDF$observed - observedMean)^2)
+# 
+# # WHY different????????
+# testRSquare <- 1- testSSE/testSST
+# testSSR/testSST
+# 
+# resultTest <- data.frame(MAE = mean(testPredDF$absError),
+#                          MAPE = mean(testPredDF$percentAbsError),
+#                          R_Square = testRSquare)
+
+```
+
+### 4.1 Training and Test
+
+We build OLS model using the 26 variables presented and analyzed above. The **R Square** and **Adjusted R Square** shows our model explains nearly 60% of the variances in the observed sale price data. Due to the limitation of data resources and domain knowledge, we regard our model as a fair fit. And the extremely small **p-value** also tells us our model delivers significant statistical meaning. 
+
+#### Training Set Results
+
+```{r, warning = FALSE, message = FALSE, echo = FALSE}
+
+#Training set regression results
+reg_Train_re <- data.frame("0.597","0.585","<0.00000000000000022")
+colnames(reg_Train_re) <- c("R square","Adjusted R square","P-value")
+
+kable(reg_Train_re, align = "l") %>%
+  kable_styling(bootstrap_options = c("striped", "hover","condensed"))
+
+```
+
+#### Test Set Results
+
+We are going to test the accuracy of our model in a sample outside of the dataset used to cultivate the model. We present the "error" in observed sale price versus predicted sale price with two statistical methodology: MAE (Mean Absolute Error) and MAPE (Mean Absolute Percentage Error). MAE is the absolute value that the predicted prices are deviated from the observed on. And MAPE is the percentage of predicted price values deviated from observed ones. The lower of these two indicators are, the better our model fitted with observations. 
+
+Droping our regression model into test dataset, the goodness of fit is 64.99%. MAE shows we tend to predict a property $96672.5 more or less than the real price. And our predictions are 43.89% deviated from the reality.
+
+```{r, warning = FALSE, message = FALSE, echo = FALSE}
+
+#Test set regression results
+reg_test_re <- data.frame("0.6499","96672.5","04389")
+colnames(reg_test_re)<-c("R square","MAE","MAPE")
+row.names(reg_Train_re) <-("Regression Results")
+
+kable(reg_test_re, align = "l") %>%
+  kable_styling(bootstrap_options = c("striped", "hover","condensed"))
+
+
+```
+
+### 4.2 k-fold Cross Validation
+
+In this section, we would like to see how generalizable our model to a number of random samples. In spatial analysis, generalizability across space is one thing we should care about. 
+
+The basic idea of cross validation is to repeating running models in 100 set of training and test set. The **Mean R Square of 0.5501** with a **Standard Deviation** of 0.0498, represents the average percent of variances explained by our model for the 100 samples. The histogram plot shows the distribution of the values of R Square in these 100 times of model-running. Since it does not comply with normal distribution, we cannot confidently say out model of predicting price is generalizable in different areas. Maybe we miss some variables that explain more dimensions of the socioeconomic conditions in Dadvison County. Under this limitation, our model is likely to be restricted in a range of specific neighborhoods covered in the dataset that we used to train the model.
+
+#### Cross Validation Results
+
+```{r, warning = FALSE, message = FALSE, echo = FALSE}
+
+# Set k = 100 folds (groups)
+fitControl <- trainControl(method = "cv", number = 100)
+
+set.seed(48)
+
+lmFit <- train(SalePrice ~ ., data = InSample_2, 
+               method = "lm", 
+               trControl = fitControl)
+
+# Table of k-fold CV
+resultCV <- data.frame(Mean = 0.5501,
+                       SD = 0.0498,
+                       RMSE = 206482.4,
+                       MAE = 97683.65)
+colnames(resultCV) <- c("Mean R Square", "SD of R Square", "RMSE", "MAE")
+
+kable(resultCV, align = "l") %>%
+  kable_styling(bootstrap_options = c("striped", "hover","condensed"))
+
+# Transfrom results of this k-fold CV to data frame
+RSquareCV <- data.frame(lmFit$resample$Rsquared)
+colnames(RSquareCV) <- c("value")
+
+# Histogram of R Square of all k-fold samples
+ggplot(RSquareCV, aes(x = value)) +
+  geom_histogram(binwidth = 0.02)
+
+
+```
+
+### 4.3 Predicted & Observed Prices
+
+The plot shows to what extend our actual prediction varies from the perfect prediction. The red line is the prediction being 100% precise and the blue one the prediction driven from our model. It tells that our model tend to predict a lower price of a house than the real price. 
+
+```{r, warning = FALSE, message = FALSE, echo = FALSE}
+
+# Predicted ~ Observed
+regDF <- cbind(InSample_2$SalePrice, reg2$fitted.values)
+colnames(regDF) <- c("Observed", "Predicted")
+regDF <- as.data.frame(regDF)
+
+ggplot() + 
+  geom_point(data = regDF, aes(Observed, Predicted), size = 0.5) +
+  stat_smooth(data=regDF, aes(Observed, Observed), method = "lm", se = FALSE, size = 1, colour="brown2") + 
+  stat_smooth(data=regDF, aes(Observed, Predicted), method = "lm", se = FALSE, size = 1, colour="royalblue1") + 
+  labs(title="Predicted Housing Prices as a function\nof Observed Housing Prices",
+       subtitle="Perfect prediction in red; Actual prediction in blue") +
+  theme(plot.title = element_text(size = 18,colour = "black"))
+
+```
+
+### 4.4 Residuals Map for Test Set
+
+In previous sale price map, we observe that high house prices are clustered in three different areas. We would like to test if the variables we select in our model well captured the underlying spatial structure. In other words, we want to see the residuals are randomly distributed or clustered spatially.
+
+It's satisfying to observe the randomness of residuals, inplying that the model explains the spatial structure of housing prices in Nashville well.
+
+```{r, warning = FALSE, message = FALSE, echo = FALSE}
+
+ggplot() + 
+  geom_sf(data = baseMap, aes(), fill = "white", alpha = 0.5, colour = "grey75", size = 0.7) +
+  geom_point(data = testPredDF,
+            aes(longitude, latitude, color = factor(ntile(error,5))), size = 0.75) +
+  scale_colour_manual(values = c("#ffffcc","#a1dab4","#41b6c4","#2c7fb8","#253494"),
+                    labels = as.character(quantile(testPredDF$error,
+                                                 c(.1,.2,.4,.6,.8),na.rm=T)),
+                    name="Residuals") +  
+  labs(title = " Residuals Map for Test Set", hjust = 0.5)
+
+# # Moran's test
+# library(spdep)
+# 
+# coords <- cbind(testPredDF$longitude, testPredDF$latitude)
+# spatialWeights <- knn2nb(knearneigh(coords, 4))
+# moran.test(testPredDF$error, nb2listw(spatialWeights, style="W"))
+
+Moran <- data.frame(MoranSta = c(0.1283697899),
+                    Expectation = c(-0.00052356),
+                    Variance = c(0.0002103855),
+                    p_value = c("< 0.00000000000000022"))
+colnames(Moran) <- c("Moran's I Test", "Expectation", "Variance", "p-value")
+
+kable(Moran, align = "l") %>%
+  kable_styling(bootstrap_options = c("striped", "hover","condensed"))
+
+
+```
+
+The Moran's I Statistic of 0.1283698 with an extremely small p-value indicates that there is **NO Spatial Autocorrelation ** among the residuals, that is , these residuals are distributed randomly. Considering housing prices are clustered in some specific areas as discussed above, our model shows good ability to explain spatial structure.
+
+### 4.5 Predicted Housing Prices Map
+
+How the home prices vary spatially? The predicted house prices map shows high house prices tend to be collectively located into sub-urban areas, which may be potentially explained by that the natural and quite environments attract richer people to resident. Even though the downtown area has easier access to public services, it is also vulnerable to high crisis rate, traffic jam and noise, which lower the prices. 
+
+```{r, warning = FALSE, message = FALSE, echo = FALSE}
+
+reg2Pred <- data.frame(predictedValues = reg2$fitted.values,
+                       longitude = InSample_2$WGS1984X,
+                       latitude = InSample_2$WGS1984Y)
+
+ggplot() + 
+  geom_sf(data = baseMap, aes(), fill = "white", alpha = 0.5, colour = "grey75", size = 0.7) +
+  geom_point(data = reg2Pred,
+            aes(longitude, latitude, color = factor(ntile(predictedValues,5))), size = 0.5, alpha = 0.6) +
+  scale_colour_manual(values = c("#ffffcc","#a1dab4","#41b6c4","#2c7fb8","#253494"),
+                    labels = as.character(quantile(reg2Pred$predictedValues,
+                                                 c(.1,.2,.4,.6,.8),na.rm=T)),
+                    name="Predicted Housing Prices") +  
+  labs(title = "Predicted Housing Prices Map")
+
+```
+
+### 4.6 Generalizability
+
+#### 4.6.1 MAPE by Zip Code for Test Set
+
+We would like to visualize how our model can be generalized across spaces. The performance of our model varies in different neighborhoods. It has the highest accuracy is the southwestern part of Dadvison County, and it perfomes worse in northeastern, southeastern and western areas. The plot again shows that the values of MAPE differentiate across ZIP codes. We thus conclude that our model is not well generalizable. 
+
+```{r, warning = FALSE, message = FALSE, echo = FALSE}
+
+testPredDF_Summary <-
+  testPredDF %>%
+  group_by(Zip) %>%
+  summarize(MAPE = mean(percentAbsError, na.rm=TRUE),
+            meanPrice = mean(observedSales, na.rm = TRUE)) %>%
+  mutate(Legend="MAPE by Zip Code") %>%
+  left_join(baseMap, by = c("Zip" = "zip")) %>%
+  st_sf()
+
+ggplot() +
+  geom_sf(data = baseMap, fill = "white", alpha = 0.5, colour = "grey75", size = 0.7) +
+  geom_sf(data = testPredDF_Summary, aes(fill = MAPE, color = MAPE), colour = "grey75", size = 0.7) +
+  scale_fill_gradient(low = "#56B1F7", high = "#132B43")
+
+```
+
+#### 4.6.2 MAPE & Mean Price by Zip Code
+
+According to the fitted line in red, it seems that prediction accuracy increses as mean housing price increses. However,  such pattern is hard to determind from the scatter plot, due to the limited number of areas classified by Zip code.
+
+```{r, warning = FALSE, message = FALSE, echo = FALSE}
+
+ggplot() +
+  geom_point(data = testPredDF_Summary, aes(meanPrice, MAPE)) +
+  stat_smooth(data = testPredDF_Summary, aes(meanPrice, MAPE), method = "lm", se = FALSE, size = 1, colour="red") +
+  labs(x = "Mean Price by Zip Code", y = "MAPE by Zip Code")
+
+```
+
+## 5. Discussion
+
+The MAPE (Mean Average Percent Error) value of our model is around 40%, which indicates if we predict a house actually valued 30,000 dollars, the error is likely to be 30,000 × 40% = 12,000 dollars. The error varies from one observation to another but the average (or expected) error finally sets to 40%. Thus, it seems that the performance of the model is not satisfying enough. We can safely believe in the predicted price if the MAPE can be reduced to 15%.
+
+During the process of test-and-error, we found that the accuracy would markedly increase if we remove observations of condominium, while the observations would decrease to 5400, too small compared to original sample of 9000 observations, and it violates the principle of generalization (i.e., predicting all types of houses). However, it occurred to us that the model can be correspondingly improved if we thoroughly take parameters relevant to differences of condominium and other types into consideration. In addition, we witnessed the significance and outstanding effect of average price of nearest 5 or 10 houses applied into the model.
+
+The model performed best in suburban Nashville with relatively higher housing prices. It can be resulted from the missing of variables associated with houses in poorer neighborhoods while the model explains characters of houses in wealthier neighborhoods better. But in general, the errors between predicted and actual prices are randomly distributed, which indicates that the model predicts well across neighborhoods of different characters rather than performs well only in some specific areas.
+
+## 6. Conclusion
+
+We won't recommend the model to Zillow since it still needs modification to improve its accuracy. We might add average price of nearest 5 or 10 house to the model, which is the most useful and significant variable found until now as discussed above. Since significances of same variables vary in different combinations, the possibility remains that we regarded some predictors as insignificant that should have been important due to limited trials. More attempts are needed to dig out some latent parameters we ignored before, which can be achieved more efficiently by computer through loops instead of manual adjustment.
