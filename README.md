@@ -16,7 +16,7 @@
   - ac_sfyi（是否有中央空调）
   - baths（浴室数量）
   - Fixtures（家具数量）
- - Regional Amenity Access or Public Service（区域公共设施及服务）
+- Regional Amenity Access or Public Service（区域公共设施及服务）
   - d_library（最近的图书馆距离）
   - d_Water（最近的供水厂距离）
   - d_Parks（最近的公园距离）
@@ -27,7 +27,7 @@
   - d_Hospital（最近的一员距离）
   - d_Recycle（最近的垃圾回收厂距离）
   - d_MTA（最近的市域交通站距离）
- - 空间结构（Spatial Structure）
+- 空间结构（Spatial Structure）
   - LocationZip（房屋所属区域邮编）
   - NeighborhoodAssessor（Zillow 公司根据房屋周边环境属性的分组代码）
   - CouncilDistrict（纳税分区）
