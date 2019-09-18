@@ -1,4 +1,4 @@
-# Housing-Prices-in-Nashville（Nashville 市房价分析）
+# Housing Prices in Nashville（Nashville 市房价分析）
 
 在线预览该 repository 中的 Housing Prices in Nashiville.html 文件，请点击该链接：https://jax0048.github.io/Housing-Prices-in-Nashville/Housing%20Prices%20in%20Nashville.html
 
